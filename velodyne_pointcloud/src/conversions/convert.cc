@@ -206,13 +206,20 @@ void Convert::processScan(const velodyne_msgs::msg::VelodyneScan::SharedPtr scan
 
   output_builder.set_extract_range(data_->getMinRange(), data_->getMaxRange());
 
+  velodyne_pointcloud::PointcloudXYZIRADT first_packet_points;
+  first_packet_points.pc->points.reserve(data_->scansPerPacket());
+  data_->unpack(scanMsg->packets.front(), first_packet_points);
+
   if (activate_xyziradt || activate_xyzir) {
     // Add the overflow buffer points
-    for (size_t i = 0; i < _overflow_buffer.pc->points.size(); ++i) {
-      auto &point = _overflow_buffer.pc->points[i];
-      output_builder.addPoint(point.x, point.y, point.z, point.return_type,
-          point.ring, point.azimuth, point.distance, point.intensity, point.time_stamp);
+    if (_overflow_buffer.pc->points.size() > 0 && first_packet_points.pc->points.front().time_stamp - _overflow_buffer.pc->points.back().time_stamp < 0.05) {
+      for (size_t i = 0; i < _overflow_buffer.pc->points.size(); ++i) {
+        auto &point = _overflow_buffer.pc->points[i];
+        output_builder.addPoint(point.x, point.y, point.z, point.return_type,
+            point.ring, point.azimuth, point.distance, point.intensity, point.time_stamp);
+      }
     }
+  
     // Reset overflow buffer
     _overflow_buffer.pc->points.clear();
     _overflow_buffer.pc->width = 0;
